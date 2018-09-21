@@ -35,6 +35,8 @@
 extern "C" {
 #endif
 
+#include "usrsctp-config.h"
+
 #include <errno.h>
 #include <sys/types.h>
 #ifdef _WIN32
@@ -45,6 +47,7 @@ extern "C" {
 #include <ws2tcpip.h>
 #else
 #include <sys/socket.h>
+#include <sys/uio.h>
 #include <netinet/in.h>
 #endif
 
@@ -91,8 +94,7 @@ typedef uint32_t sctp_assoc_t;
 /* The definition of struct sockaddr_conn MUST be in
  * tune with other sockaddr_* structures.
  */
-#if defined(__APPLE__) || defined(__Bitrig__) || defined(__DragonFly__) || \
-    defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__)
+#ifdef HAVE_SCONN_LEN
 struct sockaddr_conn {
 	uint8_t sconn_len;
 	uint8_t sconn_family;
@@ -244,6 +246,18 @@ struct sctp_assoc_change {
 	sctp_assoc_t sac_assoc_id;
 	uint8_t sac_info[]; /* not available yet */
 };
+
+#ifdef _WIN32
+
+struct iovec {
+	unsigned long len;
+	char *buf;
+};
+
+#define iov_base buf
+#define iov_len len
+
+#endif
 
 /* sac_state values */
 #define SCTP_COMM_UP        0x0001
@@ -483,10 +497,10 @@ struct sctp_event_subscribe {
 
 
 /*
- * user socket options: socket API defined
+ * user socket settings: socket API defined
  */
 /*
- * read-write options
+ * read-write settings
  */
 #define SCTP_RTOINFO                    0x00000001
 #define SCTP_ASSOCINFO                  0x00000002
@@ -497,7 +511,7 @@ struct sctp_event_subscribe {
 #define SCTP_ADAPTATION_LAYER           0x00000008
 #define SCTP_DISABLE_FRAGMENTS          0x00000009
 #define SCTP_PEER_ADDR_PARAMS           0x0000000a
-/* ancillary data/notification interest options */
+/* ancillary data/notification interest settings */
 /* Without this applied we will give V4 and V6 addresses on a V6 socket */
 #define SCTP_I_WANT_MAPPED_V4_ADDR      0x0000000d
 #define SCTP_MAXSEG                     0x0000000e
@@ -529,7 +543,7 @@ struct sctp_event_subscribe {
 #define SCTP_SS_VALUE                   0x00001204
 
 /*
- * read-only options
+ * read-only settings
  */
 #define SCTP_STATUS                     0x00000100
 #define SCTP_GET_PEER_ADDR_INFO         0x00000101
@@ -543,7 +557,7 @@ struct sctp_event_subscribe {
 #define SCTP_PR_ASSOC_STATUS            0x00000108
 
 /*
- * write-only options
+ * write-only settings
  */
 #define SCTP_SET_PEER_PRIMARY_ADDR      0x00000006
 #define SCTP_AUTH_CHUNK                 0x00000012
@@ -847,20 +861,33 @@ struct sctp_prstatus {
 /* First-come, first-serve */
 #define SCTP_SS_FIRST_COME          0x00000005
 
+/*
+ * Socket event flags
+ */
+#define SCTP_EVENT_READ		0x00000001
+#define SCTP_EVENT_WRITE	0x00000002
+#define SCTP_EVENT_ERROR	0x00000004
+
 /******************** System calls *************/
 
 struct socket;
 
+typedef int (*conn_output_fn)(void*, void*, size_t, uint8_t, uint8_t);
+typedef void (*debug_printf_fn)(const char *format, ...);
+
+#define SCTP_THREAD_TIMER	0x00001
+#define SCTP_THREAD_RECV	0x00002
+
 void
 usrsctp_init(uint16_t,
              int (*)(void *addr, void *buffer, size_t length, uint8_t tos, uint8_t set_df),
-             void (*)(const char *format, ...));
+             void (*)(const char *format, ...), int threads);
 
 struct socket *
 usrsctp_socket(int domain, int type, int protocol,
                int (*receive_cb)(struct socket *sock, union sctp_sockstore addr, void *data,
                                  size_t datalen, struct sctp_rcvinfo, int flags, void *ulp_info),
-               int (*send_cb)(struct socket *sock, uint32_t sb_free),
+               int (*send_cb)(struct socket *sock, uint32_t sb_free, void *ulp_info),
                uint32_t sb_threshold,
                void *ulp_info);
 
@@ -898,6 +925,17 @@ ssize_t
 usrsctp_sendv(struct socket *so,
               const void *data,
               size_t len,
+              struct sockaddr *to,
+              int addrcnt,
+              void *info,
+              socklen_t infolen,
+              unsigned int infotype,
+              int flags);
+
+ssize_t
+usrsctp_sendvec(struct socket *so,
+              const struct iovec *iov,
+              int iovcnt,
               struct sockaddr *to,
               int addrcnt,
               void *info,
@@ -973,6 +1011,13 @@ usrsctp_set_non_blocking(struct socket *, int);
 int
 usrsctp_get_non_blocking(struct socket *);
 
+int
+usrsctp_get_events(struct socket *so);
+
+int
+usrsctp_set_upcall(struct socket *so,
+		void (*upcall)(struct socket *, void *, int), void *arg);
+
 void
 usrsctp_register_address(void *);
 
@@ -981,6 +1026,9 @@ usrsctp_deregister_address(void *);
 
 int
 usrsctp_set_ulpinfo(struct socket *, void *);
+
+void
+usrsctp_fire_timer(int delta);
 
 #define SCTP_DUMP_OUTBOUND 1
 #define SCTP_DUMP_INBOUND  0
@@ -1230,6 +1278,8 @@ struct sctpstat {
 
 void
 usrsctp_get_stat(struct sctpstat *);
+
+void usrsctp_wsa_sync_last_error(void);
 
 #ifdef _WIN32
 #ifdef _MSC_VER

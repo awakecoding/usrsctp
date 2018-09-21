@@ -75,7 +75,7 @@ void
 #if defined(__Userspace__)
 sctp_init(uint16_t port,
           int (*conn_output)(void *addr, void *buffer, size_t length, uint8_t tos, uint8_t set_df),
-          void (*debug_printf)(const char *format, ...))
+          void (*debug_printf)(const char *format, ...), int start_threads)
 #elif defined(__APPLE__) && (!defined(APPLE_LEOPARD) && !defined(APPLE_SNOWLEOPARD) &&!defined(APPLE_LION) && !defined(APPLE_MOUNTAINLION))
 sctp_init(struct protosw *pp SCTP_UNUSED, struct domain *dp SCTP_UNUSED)
 #else
@@ -148,9 +148,10 @@ sctp_init(void)
 	SCTP_BASE_VAR(conn_output) = conn_output;
 	SCTP_BASE_VAR(debug_printf) = debug_printf;
 #endif
-	sctp_pcb_init();
+	sctp_pcb_init(start_threads);
 #if defined(__Userspace__)
-	sctp_start_timer();
+	if (start_threads & SCTP_THREAD_TIMER)
+		sctp_start_timer();
 #endif
 #if defined(SCTP_PACKET_LOGGING)
 	SCTP_BASE_VAR(packet_log_writers) = 0;
@@ -6313,7 +6314,7 @@ sctp_setopt(struct socket *so, int optname, void *optval, size_t optsize,
 				SCTP_INP_WLOCK(inp);
 				/*
 				 * For the TOS/FLOWLABEL stuff you set it
-				 * with the options on the socket
+				 * with the settings on the socket
 				 */
 				if (paddrp->spp_pathmaxrxt != 0) {
 					inp->sctp_ep.def_net_failure = paddrp->spp_pathmaxrxt;
@@ -8951,7 +8952,7 @@ register_recv_cb(struct socket *so,
 }
 
 int
-register_send_cb(struct socket *so, uint32_t sb_threshold, int (*send_cb)(struct socket *sock, uint32_t sb_free))
+register_send_cb(struct socket *so, uint32_t sb_threshold, int (*send_cb)(struct socket *sock, uint32_t sb_free, void *ulp_info))
 {
 	struct sctp_inpcb *inp;
 

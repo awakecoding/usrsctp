@@ -58,8 +58,11 @@ __FBSDID("$FreeBSD: head/sys/netinet/sctp_output.c 307779 2016-10-22 17:21:21Z t
 #define __FAVOR_BSD    /* (on Ubuntu at least) enables UDP header field names like BSD in RFC 768 */
 #endif
 #if defined(INET) || defined(INET6)
-#if !defined(__Userspace_os_Windows)
+#if !defined(__Userspace_os_Windows) && !defined(__Userspace_os_IOS)
 #include <netinet/udp.h>
+#endif
+#if defined(__Userspace_os_IOS)
+#include "ios_udp.h"
 #endif
 #endif
 #if defined(__APPLE__)
@@ -10769,8 +10772,8 @@ send_forward_tsn(struct sctp_tcb *stcb,
 {
 	struct sctp_tmit_chunk *chk, *at, *tp1, *last;
 	struct sctp_forward_tsn_chunk *fwdtsn;
-	struct sctp_strseq *strseq;
-	struct sctp_strseq_mid *strseq_m;
+	struct sctp_strseq *strseq = NULL;
+	struct sctp_strseq_mid *strseq_m = NULL;
 	uint32_t advance_peer_ack_point;
 	unsigned int cnt_of_space, i, ovh;
 	unsigned int space_needed;
@@ -13785,7 +13788,7 @@ sctp_lower_sosend(struct socket *so,
 		}
 	}
 #if defined(__Userspace__)
-	if (inp->recv_callback) {
+	if (inp->recv_callback || SCTP_SO_IS_NBIO(so)) {
 		non_blocking = 1;
 	}
 #endif

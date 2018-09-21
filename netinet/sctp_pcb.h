@@ -599,7 +599,7 @@ struct sctp_inpcb {
 	int (*recv_callback)(struct socket *, union sctp_sockstore, void *, size_t,
                              struct sctp_rcvinfo, int, void *);
 	uint32_t send_sb_threshold;
-	int (*send_callback)(struct socket *, uint32_t);
+	int (*send_callback)(struct socket *, uint32_t, void *);
 #endif
 };
 
@@ -607,7 +607,7 @@ struct sctp_inpcb {
 int register_recv_cb (struct socket *,
                       int (*)(struct socket *, union sctp_sockstore, void *, size_t,
                               struct sctp_rcvinfo, int, void *));
-int register_send_cb (struct socket *, uint32_t, int (*)(struct socket *, uint32_t));
+int register_send_cb (struct socket *, uint32_t, int (*)(struct socket *, uint32_t, void*));
 int register_ulp_info (struct socket *, void *);
 
 #endif
@@ -838,7 +838,10 @@ void sctp_remove_net(struct sctp_tcb *, struct sctp_nets *);
 
 int sctp_del_remote_addr(struct sctp_tcb *, struct sockaddr *);
 
-void sctp_pcb_init(void);
+#define SCTP_THREAD_TIMER	0x00001
+#define SCTP_THREAD_RECV	0x00002
+
+void sctp_pcb_init(int start_threads);
 
 void sctp_pcb_finish(void);
 

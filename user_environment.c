@@ -94,3 +94,185 @@ read_random_phony(void *buf, int count)
 	return (count);
 }
 
+void usrsctp_wsa_sync_last_error(void)
+{
+#ifdef _WIN32
+	int iError = 0;
+
+	switch (errno)
+	{
+		/* Base error codes */
+
+		case EINTR:
+			iError = WSAEINTR;
+			break;
+		case EBADF:
+			iError = WSAEBADF;
+			break;
+		case EACCES:
+			iError = WSAEACCES;
+			break;
+		case EFAULT:
+			iError = WSAEFAULT;
+			break;
+		case EINVAL:
+			iError = WSAEINVAL;
+			break;
+		case EMFILE:
+			iError = WSAEMFILE;
+			break;
+
+		/* BSD sockets error codes */
+
+		case EWOULDBLOCK:
+			iError = WSAEWOULDBLOCK;
+			break;
+		case EINPROGRESS:
+			iError = WSAEINPROGRESS;
+			break;
+		case EALREADY:
+			iError = WSAEALREADY;
+			break;
+		case ENOTSOCK:
+			iError = WSAENOTSOCK;
+			break;
+		case EDESTADDRREQ:
+			iError = WSAEDESTADDRREQ;
+			break;
+		case EMSGSIZE:
+			iError = WSAEMSGSIZE;
+			break;
+		case EPROTOTYPE:
+			iError = WSAEPROTOTYPE;
+			break;
+		case ENOPROTOOPT:
+			iError = WSAENOPROTOOPT;
+			break;
+		case EPROTONOSUPPORT:
+			iError = WSAEPROTONOSUPPORT;
+			break;
+		case ESOCKTNOSUPPORT:
+			iError = WSAESOCKTNOSUPPORT;
+			break;
+		case EOPNOTSUPP:
+			iError = WSAEOPNOTSUPP;
+			break;
+		case EPFNOSUPPORT:
+			iError = WSAEPFNOSUPPORT;
+			break;
+		case EAFNOSUPPORT:
+			iError = WSAEAFNOSUPPORT;
+			break;
+		case EADDRINUSE:
+			iError = WSAEADDRINUSE;
+			break;
+		case EADDRNOTAVAIL:
+			iError = WSAEADDRNOTAVAIL;
+			break;
+		case ENETDOWN:
+			iError = WSAENETDOWN;
+			break;
+		case ENETUNREACH:
+			iError = WSAENETUNREACH;
+			break;
+		case ENETRESET:
+			iError = WSAENETRESET;
+			break;
+		case ECONNABORTED:
+			iError = WSAECONNABORTED;
+			break;
+		case ECONNRESET:
+			iError = WSAECONNRESET;
+			break;
+		case ENOBUFS:
+			iError = WSAENOBUFS;
+			break;
+		case EISCONN:
+			iError = WSAEISCONN;
+			break;
+		case ENOTCONN:
+			iError = WSAENOTCONN;
+			break;
+		case ESHUTDOWN:
+			iError = WSAESHUTDOWN;
+			break;
+		case ETOOMANYREFS:
+			iError = WSAETOOMANYREFS;
+			break;
+		case ETIMEDOUT:
+			iError = WSAETIMEDOUT;
+			break;
+		case ECONNREFUSED:
+			iError = WSAECONNREFUSED;
+			break;
+		case ELOOP:
+			iError = WSAELOOP;
+			break;
+		case ENAMETOOLONG:
+			iError = WSAENAMETOOLONG;
+			break;
+		case EHOSTDOWN:
+			iError = WSAEHOSTDOWN;
+			break;
+		case EHOSTUNREACH:
+			iError = WSAEHOSTUNREACH;
+			break;
+		case ENOTEMPTY:
+			iError = WSAENOTEMPTY;
+			break;
+#ifdef EPROCLIM
+		case EPROCLIM:
+			iError = WSAEPROCLIM;
+			break;
+#endif
+		case EUSERS:
+			iError = WSAEUSERS;
+			break;
+		case EDQUOT:
+			iError = WSAEDQUOT;
+			break;
+		case ESTALE:
+			iError = WSAESTALE;
+			break;
+		case EREMOTE:
+			iError = WSAEREMOTE;
+			break;
+
+		/* Special cases */
+
+#if (EAGAIN != EWOULDBLOCK)
+		case EAGAIN:
+			iError = WSAEWOULDBLOCK;
+			break;
+#endif
+
+#if defined(EPROTO)
+		case EPROTO:
+			iError = WSAECONNRESET;
+			break;
+#endif
+	}
+
+	/**
+	* Windows Sockets Extended Error Codes:
+	*
+	* WSASYSNOTREADY
+	* WSAVERNOTSUPPORTED
+	* WSANOTINITIALISED
+	* WSAEDISCON
+	* WSAENOMORE
+	* WSAECANCELLED
+	* WSAEINVALIDPROCTABLE
+	* WSAEINVALIDPROVIDER
+	* WSAEPROVIDERFAILEDINIT
+	* WSASYSCALLFAILURE
+	* WSASERVICE_NOT_FOUND
+	* WSATYPE_NOT_FOUND
+	* WSA_E_NO_MORE
+	* WSA_E_CANCELLED
+	* WSAEREFUSED
+	*/
+
+	WSASetLastError(iError);
+#endif
+}

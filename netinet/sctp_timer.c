@@ -55,8 +55,11 @@ __FBSDID("$FreeBSD: head/sys/netinet/sctp_timer.c 299273 2016-05-09 16:35:05Z tu
 #include <netinet/sctp.h>
 #include <netinet/sctp_uio.h>
 #if defined(INET) || defined(INET6)
-#if !defined(__Userspace_os_Windows)
+#if !defined(__Userspace_os_Windows) && !defined(__Userspace_os_IOS)
 #include <netinet/udp.h>
+#endif
+#if defined(__Userspace_os_IOS)
+#include "ios_udp.h"
 #endif
 #endif
 

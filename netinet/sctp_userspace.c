@@ -42,6 +42,11 @@
 #include <sys/prctl.h>
 #endif
 
+#ifdef __Userspace_os_UWP
+#define GlobalAlloc(_uFlags, _dwBytes)	calloc(1, _dwBytes)
+#define GlobalFree(_hMem)		free(_hMem)
+#endif
+
 #if defined(__Userspace_os_Windows)
 /* Adapter to translate Unix thread start routines to Windows thread start
  * routines.

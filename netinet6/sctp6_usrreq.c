@@ -56,9 +56,13 @@ __FBSDID("$FreeBSD: head/sys/netinet6/sctp6_usrreq.c 302138 2016-06-23 09:13:15Z
 #include <netinet/sctp_output.h>
 #include <netinet/sctp_bsd_addr.h>
 #include <netinet/sctp_crc32.h>
-#if !defined(__Userspace_os_Windows)
+#if !defined(__Userspace_os_Windows) && !defined(__Userspace_os_IOS)
 #include <netinet/icmp6.h>
 #include <netinet/udp.h>
+#endif
+#if defined(__Userspace_os_IOS)
+#include "ios_icmp6.h"
+#include "ios_udp.h"
 #endif
 
 #if defined(__APPLE__)

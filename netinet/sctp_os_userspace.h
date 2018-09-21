@@ -496,7 +496,11 @@ struct sx {int dummy;};
 #include <sys/types.h>
 #if !defined(__Userspace_os_Windows)
 #if defined(INET) || defined(INET6)
+#if defined(__Userspace_os_Android)
+#include "android_ifaddrs.h"
+#else
 #include <ifaddrs.h>
+#endif
 #endif
 
 /* for ioctl */
@@ -528,8 +532,11 @@ struct sx {int dummy;};
 #ifdef IPSEC
 #include <netipsec/ipsec6.h>
 #endif
-#if !defined(__Userspace_os_Windows)
+#if !defined(__Userspace_os_Windows) && !defined(__Userspace_os_IOS)
 #include <netinet/ip6.h>
+#endif
+#if defined(__Userspace_os_IOS)
+#include "ios_ip6.h"
 #endif
 #if defined(__Userspace_os_Darwin) || defined(__Userspace_os_FreeBSD) || defined(__Userspace_os_Linux) || defined(__Userspace_os_NetBSD) || defined(__Userspace_os_OpenBSD) || defined(__Userspace_os_Windows)
 #include "user_ip6_var.h"

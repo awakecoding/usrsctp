@@ -39,6 +39,7 @@
 #include <netinet/sctp_sysctl.h>
 #include <netinet/sctp_input.h>
 #include <netinet/sctp_peeloff.h>
+#include <netinet/sctp_callout.h>
 #ifdef INET6
 #include <netinet6/sctp6_var.h>
 #endif
@@ -48,9 +49,14 @@
 #if defined(__Userspace_os_Linux)
 #define __FAVOR_BSD    /* (on Ubuntu at least) enables UDP header field names like BSD in RFC 768 */
 #endif
-#if !defined (__Userspace_os_Windows)
+#if !defined (__Userspace_os_Windows) && !defined(__Userspace_os_IOS)
 #if defined INET || defined INET6
 #include <netinet/udp.h>
+#endif
+#endif
+#if defined(__Userspace_os_IOS)
+#if defined INET || defined INET6
+#include "ios_udp.h"
 #endif
 #include <arpa/inet.h>
 #else
@@ -76,11 +82,7 @@ extern int sctp_sosend(struct socket *so, struct sockaddr *addr, struct uio *uio
 extern int sctp_attach(struct socket *so, int proto, uint32_t vrf_id);
 extern int sctpconn_attach(struct socket *so, int proto, uint32_t vrf_id);
 
-void
-usrsctp_init(uint16_t port,
-             int (*conn_output)(void *addr, void *buffer, size_t length, uint8_t tos, uint8_t set_df),
-             void (*debug_printf)(const char *format, ...))
-{
+static void init_sync() {
 #if defined(__Userspace_os_Windows)
 #if defined(INET) || defined(INET6)
 	WSADATA wsaData;
@@ -103,9 +105,16 @@ usrsctp_init(uint16_t port,
 	pthread_mutexattr_destroy(&mutex_attr);
 	pthread_cond_init(&accept_cond, NULL);
 #endif
-	sctp_init(port, conn_output, debug_printf);
 }
 
+void
+usrsctp_init(uint16_t port,
+	int (*conn_output)(void *addr, void *buffer, size_t length, uint8_t tos, uint8_t set_df),
+	void (*debug_printf)(const char *format, ...), int threads)
+{
+	init_sync();
+	sctp_init(port, conn_output, debug_printf, threads);
+}
 
 /* Taken from  usr/src/sys/kern/uipc_sockbuf.c and modified for __Userspace__*/
 /*
@@ -823,33 +832,44 @@ userspace_sctp_sendmsg(struct socket *so,
 }
 
 
+size_t
+iovec_len(const struct iovec* iov, int iovcnt)
+{
+	size_t size = 0;
+	int i;
+
+	for (i = 0; i < iovcnt; ++i) {
+		size += iov[i].iov_len;
+	}
+
+	return size;
+}
+
 ssize_t
-usrsctp_sendv(struct socket *so,
-              const void *data,
-              size_t len,
-              struct sockaddr *to,
-              int addrcnt,
-              void *info,
-              socklen_t infolen,
-              unsigned int infotype,
-              int flags)
+usrsctp_sendvec(struct socket *so,
+		const struct iovec *iov,
+		int iovcnt,
+		struct sockaddr *to,
+		int addrcnt,
+		void *info,
+		socklen_t infolen,
+		unsigned int infotype,
+		int flags)
 {
 	struct sctp_sndrcvinfo sinfo;
 	struct uio auio;
-	struct iovec iov[1];
 	int use_sinfo;
-	sctp_assoc_t *assoc_id;
+	int len;
 
 	if (so == NULL) {
 		errno = EBADF;
 		return (-1);
 	}
-	if (data == NULL) {
+	if (iov == NULL) {
 		errno = EFAULT;
 		return (-1);
 	}
 	memset(&sinfo, 0, sizeof(struct sctp_sndrcvinfo));
-	assoc_id = NULL;
 	use_sinfo = 0;
 	switch (infotype) {
 	case SCTP_SENDV_NOINFO:
@@ -868,7 +888,6 @@ usrsctp_sendv(struct socket *so,
 		sinfo.sinfo_ppid = ((struct sctp_sndinfo *)info)->snd_ppid;
 		sinfo.sinfo_context = ((struct sctp_sndinfo *)info)->snd_context;
 		sinfo.sinfo_assoc_id = ((struct sctp_sndinfo *)info)->snd_assoc_id;
-		assoc_id = &(((struct sctp_sndinfo *)info)->snd_assoc_id);
 		use_sinfo = 1;
 		break;
 	case SCTP_SENDV_PRINFO:
@@ -895,7 +914,6 @@ usrsctp_sendv(struct socket *so,
 			sinfo.sinfo_ppid = ((struct sctp_sendv_spa *)info)->sendv_sndinfo.snd_ppid;
 			sinfo.sinfo_context = ((struct sctp_sendv_spa *)info)->sendv_sndinfo.snd_context;
 			sinfo.sinfo_assoc_id = ((struct sctp_sendv_spa *)info)->sendv_sndinfo.snd_assoc_id;
-			assoc_id = &(((struct sctp_sendv_spa *)info)->sendv_sndinfo.snd_assoc_id);
 		} else {
 			sinfo.sinfo_flags = 0;
 			sinfo.sinfo_stream = 0;
@@ -921,26 +939,45 @@ usrsctp_sendv(struct socket *so,
 		return (-1);
 	}
 
-	iov[0].iov_base = (caddr_t)data;
-	iov[0].iov_len = len;
+	len = iovec_len(iov, iovcnt);
 
-	auio.uio_iov =  iov;
-	auio.uio_iovcnt = 1;
+	auio.uio_iov = (struct iovec*) iov;
+	auio.uio_iovcnt = iovcnt;
 	auio.uio_segflg = UIO_USERSPACE;
 	auio.uio_rw = UIO_WRITE;
 	auio.uio_offset = 0;			/* XXX */
 	auio.uio_resid = len;
 	errno = sctp_lower_sosend(so, to, &auio, NULL, NULL, flags, use_sinfo ? &sinfo : NULL);
 	if (errno == 0) {
-		if ((to != NULL) && (assoc_id != NULL)) {
-			*assoc_id = usrsctp_getassocid(so, to);
-		}
 		return (len - auio.uio_resid);
 	} else {
 		return (-1);
 	}
 }
 
+ssize_t
+usrsctp_sendv(struct socket *so,
+	      const void *data,
+	      size_t len,
+	      struct sockaddr *to,
+	      int addrcnt,
+	      void *info,
+	      socklen_t infolen,
+	      unsigned int infotype,
+	      int flags)
+{
+	struct iovec iov;
+
+	if (data == NULL) {
+		errno = EFAULT;
+		return (-1);
+	}
+
+	iov.iov_base = (char*)data;
+	iov.iov_len = len;
+
+	return usrsctp_sendvec(so, &iov, 1, to, addrcnt, info, infolen, infotype, flags);
+}
 
 ssize_t
 userspace_sctp_sendmbuf(struct socket *so,
@@ -1410,7 +1447,7 @@ struct socket *
 usrsctp_socket(int domain, int type, int protocol,
 	       int (*receive_cb)(struct socket *sock, union sctp_sockstore addr, void *data,
                                  size_t datalen, struct sctp_rcvinfo, int flags, void *ulp_info),
-	       int (*send_cb)(struct socket *sock, uint32_t sb_free),
+	       int (*send_cb)(struct socket *sock, uint32_t sb_free, void *ulp_info),
 	       uint32_t sb_threshold,
 	       void *ulp_info)
 {
@@ -1562,8 +1599,9 @@ sowakeup(struct socket *so, struct sockbuf *sb)
 #endif
 	}
 	SOCKBUF_UNLOCK(sb);
-	/*__Userspace__ what todo about so_upcall?*/
 
+	if ((sb->sb_flags & SB_UPCALL) && so->so_upcall != NULL)
+		(*so->so_upcall)(so, so->so_upcallarg, M_NOWAIT);
 }
 #else /* kernel version for reference */
 /*
@@ -2026,6 +2064,46 @@ usrsctp_get_non_blocking(struct socket *so)
 }
 
 int
+usrsctp_get_events(struct socket *so)
+{
+	int events = 0;
+
+	if (so == NULL) {
+		errno = EBADF;
+		return -1;
+	}
+
+	if (soreadable(so)) {
+		events |= SCTP_EVENT_READ;
+	}
+	if (sowriteable(so)) {
+		events |= SCTP_EVENT_WRITE;
+	}
+	if (so->so_error) {
+		events |= SCTP_EVENT_ERROR;
+	}
+	return events;
+}
+
+int
+usrsctp_set_upcall(struct socket *so, void (*upcall)(struct socket *, void *, int), void *arg)
+{
+	if (so == NULL) {
+		errno = EBADF;
+		return (-1);
+	}
+
+	SOCK_LOCK(so);
+	so->so_upcall = upcall;
+	so->so_upcallarg = arg;
+	so->so_snd.sb_flags |= SB_UPCALL;
+	so->so_rcv.sb_flags |= SB_UPCALL;
+	SOCK_UNLOCK(so);
+
+	return (0);
+}
+
+int
 soconnect(struct socket *so, struct sockaddr *nam)
 {
 	int error;
@@ -2223,6 +2301,7 @@ usrsctp_finish(void)
 	if (SCTP_BASE_VAR(sctp_pcb_initialized) == 0) {
 		return (0);
 	}
+
 	if (SCTP_INP_INFO_TRYLOCK()) {
 		if (!LIST_EMPTY(&SCTP_BASE_INFO(listhead))) {
 			SCTP_INP_INFO_RUNLOCK();
@@ -2402,6 +2481,16 @@ usrsctp_getsockopt(struct socket *so, int level, int option_name,
 					l->l_onoff = 0;
 				}
 				*option_len = (socklen_t)sizeof(struct linger);
+				return (0);
+			}
+		case SO_ERROR:
+			if (*option_len < sizeof(int)) {
+				errno = EINVAL;
+				return (-1);
+			} else {
+				int *intval = (int *)option_value;
+				*intval = so->so_error;
+				*option_len = (socklen_t)sizeof(int);
 				return (0);
 			}
 		default:
@@ -3357,6 +3446,10 @@ usrsctp_conninput(void *addr, const void *buffer, size_t length, uint8_t ecn_bit
 	return;
 }
 
+void usrsctp_fire_timer(int delta)
+{
+	sctp_handle_tick(MSEC_TO_TICKS(delta));
+}
 
 #define USRSCTP_SYSCTL_SET_DEF(__field) \
 void usrsctp_sysctl_set_ ## __field(uint32_t value) { \

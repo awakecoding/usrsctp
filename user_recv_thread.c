@@ -56,8 +56,11 @@
 #endif
 #endif
 #endif
-#if defined(__Userspace_os_Darwin) || defined(__Userspace_os_DragonFly) || defined(__Userspace_os_FreeBSD)
+#if (defined(__Userspace_os_Darwin) || defined(__Userspace_os_DragonFly) || defined(__Userspace_os_FreeBSD)) && !defined(__Userspace_os_IOS)
 #include <net/route.h>
+#endif
+#if defined(__Userspace_os_IOS)
+#include "ios_route.h"
 #endif
 /* local macros and datatypes used to get IP addresses system independently */
 #if !defined(IP_PKTINFO ) && ! defined(IP_RECVDSTADDR)

@@ -52,6 +52,14 @@ __FBSDID("$FreeBSD: head/sys/netinet/sctp_bsd_addr.c 307779 2016-10-22 17:21:21Z
 #include <sys/unistd.h>
 #endif
 
+#ifdef __Userspace_os_UWP
+#define MIB_IF_TYPE_ETHERNET		6
+#define IF_TYPE_ETHERNET_CSMACD		6
+#define IF_TYPE_IEEE80211		71
+#define GlobalAlloc(_uFlags, _dwBytes)	calloc(1, _dwBytes)
+#define GlobalFree(_hMem)		free(_hMem)
+#endif
+
 /* Declare all of our malloc named types */
 #ifndef __Panda__
 MALLOC_DEFINE(SCTP_M_MAP, "sctp_map", "sctp asoc map descriptor");

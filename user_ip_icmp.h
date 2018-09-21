@@ -123,7 +123,7 @@ struct icmp {
 		} id_ts;
 		struct id_ip  {
 			struct ip idi_ip;
-			/* options and then 64 bits of data */
+			/* settings and then 64 bits of data */
 		} id_ip;
 		struct icmp_ra_addr id_radv;
 		u_int32_t id_mask;

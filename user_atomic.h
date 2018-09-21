@@ -34,7 +34,7 @@
 /* __Userspace__ version of sys/i386/include/atomic.h goes here */
 
 /* TODO In the future, might want to not use i386 specific assembly.
- *    The options include:
+ *    The settings include:
  *       - implement them generically (but maybe not truly atomic?) in userspace
  *       - have ifdef's for __Userspace_arch_ perhaps (OS isn't enough...)
  */

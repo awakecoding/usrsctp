@@ -457,7 +457,7 @@ struct sctp_sysctl {
 #define SCTPCTL_MAX_RETRAN_CHUNK_MAX	65535
 #define SCTPCTL_MAX_RETRAN_CHUNK_DEFAULT	30
 
-/* sctp_logging: This gives us logging when the options are enabled */
+/* sctp_logging: This gives us logging when the settings are enabled */
 #define SCTPCTL_LOGGING_LEVEL_DESC	"Ltrace/KTR trace logging level"
 #define SCTPCTL_LOGGING_LEVEL_MIN	0
 #define SCTPCTL_LOGGING_LEVEL_MAX	0xffffffff

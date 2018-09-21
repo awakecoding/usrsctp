@@ -137,11 +137,11 @@ struct inpcb {
 	struct	label *inp_label;	/* MAC label */
 	struct	inpcbpolicy *inp_sp;    /* for IPSEC */
 
-	/* Protocol-dependent part; options. */
+	/* Protocol-dependent part; settings. */
 	struct {
 		u_char	inp4_ip_tos;		/* type of service proto */
-		struct	mbuf *inp4_options;	/* IP options */
-		struct	ip_moptions *inp4_moptions; /* IP multicast options */
+		struct	mbuf *inp4_options;	/* IP settings */
+		struct	ip_moptions *inp4_moptions; /* IP multicast settings */
 	} inp_depend4;
 #define	inp_fport	inp_inc.inc_fport
 #define	inp_lport	inp_inc.inc_lport
@@ -151,11 +151,11 @@ struct inpcb {
 #define	inp_options	inp_depend4.inp4_options
 #define	inp_moptions	inp_depend4.inp4_moptions
 	struct {
-		/* IP options */
+		/* IP settings */
 		struct	mbuf *inp6_options;
-		/* IP6 options for outgoing packets */
+		/* IP6 settings for outgoing packets */
 		struct	ip6_pktopts *inp6_outputopts;
-		/* IP multicast options */
+		/* IP multicast settings */
 #if 0
 		struct	ip6_moptions *inp6_moptions;
 #endif

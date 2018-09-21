@@ -53,8 +53,11 @@ __FBSDID("$FreeBSD: head/sys/netinet/sctp_pcb.c 307217 2016-10-13 13:53:01Z tuex
 #include <netinet/sctp_dtrace_define.h>
 #endif
 #if defined(INET) || defined(INET6)
-#if !defined(__Userspace_os_Windows)
+#if !defined(__Userspace_os_Windows) && !defined(__Userspace_os_IOS)
 #include <netinet/udp.h>
+#endif
+#if defined(__Userspace_os_IOS)
+#include "ios_udp.h"
 #endif
 #endif
 #ifdef INET6
@@ -6633,7 +6636,7 @@ sctp_netisr_hdlr(struct mbuf *m, uintptr_t source)
 #endif
 
 void
-sctp_pcb_init()
+sctp_pcb_init(int start_threads)
 {
 	/*
 	 * SCTP initialization for the PCB structures should be called by
@@ -6848,7 +6851,8 @@ sctp_pcb_init()
 	mbuf_init(NULL);
 	atomic_init();
 #if defined(INET) || defined(INET6)
-	recv_thread_init();
+	if (start_threads & SCTP_THREAD_RECV)
+		recv_thread_init();
 #endif
 #endif
 }
